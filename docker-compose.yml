@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # PHP/Apache container
+  web:
+    build: .
+    ports:
+      - "8080:80"  # Using port 8080 to avoid conflict with WAMP (port 80)
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - mysql
+    environment:
+      - APACHE_DOCUMENT_ROOT=/var/www/html
+    networks:
+      - phpapp-network
+
+  # MySQL container
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3307:3306"  # Using port 3307 to avoid conflict with WAMP MySQL (port 3306)
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: phpapp
+      MYSQL_USER: phpuser
+      MYSQL_PASSWORD: phppass
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - phpapp-network
+
+  # phpMyAdmin for database management (optional)
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    ports:
+      - "8081:80"  # Using port 8081 to avoid conflicts
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: phpuser
+      PMA_PASSWORD: phppass
+    depends_on:
+      - mysql
+    networks:
+      - phpapp-network
+
+volumes:
+  mysql_data:
+
+networks:
+  phpapp-network:
+    driver: bridge
