@@ -196,3 +196,4 @@ If recipients have issues:
 4. Restart Docker Desktop if needed
 
 **Your PHP app is now ready to be shared with the world! 🌍**
+

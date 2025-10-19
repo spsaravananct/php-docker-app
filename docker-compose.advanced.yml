@@ -1,0 +1,133 @@
+# Advanced Docker Compose configuration for learning
+version: '3.8'
+
+services:
+  # PHP/Apache web service
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.advanced
+    container_name: php-app-web
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+      - ./logs:/var/log/apache2
+    environment:
+      - APACHE_DOCUMENT_ROOT=/var/www/html
+      - PHP_MEMORY_LIMIT=256M
+      - MYSQL_HOST=mysql
+      - MYSQL_DATABASE=phpapp
+      - MYSQL_USER=phpuser
+      - MYSQL_PASSWORD=phppass
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - phpapp-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # MySQL database service
+  mysql:
+    image: mysql:8.0
+    container_name: php-app-mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: phpapp
+      MYSQL_USER: phpuser
+      MYSQL_PASSWORD: phppass
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./mysql-config:/etc/mysql/conf.d
+    networks:
+      - phpapp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # phpMyAdmin service
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: php-app-phpmyadmin
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: phpuser
+      PMA_PASSWORD: phppass
+      PMA_ARBITRARY: 1
+      UPLOAD_LIMIT: 64M
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - phpapp-network
+    restart: unless-stopped
+
+  # Redis service (for caching - optional)
+  redis:
+    image: redis:7-alpine
+    container_name: php-app-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - phpapp-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: php-app-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - web
+    networks:
+      - phpapp-network
+    restart: unless-stopped
+
+# Named volumes for persistent data
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# Custom network for service communication
+networks:
+  phpapp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1

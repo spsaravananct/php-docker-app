@@ -1,0 +1,66 @@
+# Advanced Dockerfile with explanations
+# This is an enhanced version for learning purposes
+
+# Use official PHP with Apache as base image
+FROM php:8.2-apache
+
+# Set maintainer information (best practice)
+LABEL maintainer="your-email@example.com"
+LABEL description="PHP Docker Learning App"
+LABEL version="1.0"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions
+RUN docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    mbstring \
+    exif \
+    pcntl \
+    bcmath \
+    gd
+
+# Enable Apache modules
+RUN a2enmod rewrite headers
+
+# Set working directory
+WORKDIR /var/www/html
+
+# Create a non-root user for security
+RUN groupadd -g 1000 appuser && \
+    useradd -u 1000 -ms /bin/bash -g appuser appuser
+
+# Copy application files
+COPY --chown=appuser:appuser . /var/www/html/
+
+# Set proper permissions
+RUN chown -R appuser:appuser /var/www/html && \
+    chmod -R 755 /var/www/html
+
+# Switch to non-root user
+USER appuser
+
+# Set environment variables
+ENV APACHE_DOCUMENT_ROOT=/var/www/html
+ENV PHP_MEMORY_LIMIT=256M
+ENV PHP_MAX_EXECUTION_TIME=30
+
+# Create a health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost/ || exit 1
+
+# Expose port 80
+EXPOSE 80
+
+# Start Apache in foreground
+CMD ["apache2-foreground"]
